@@ -1,0 +1,9 @@
+[package]
+name = "killjoy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+enigo = { version = "0.6.1", default-features = false, features = ["x11rb"] }
+gilrs = { version = "0.11.1", default-features = false, features = ["xinput", "serde-serialize"] }
+rofi = "0.4.0"
