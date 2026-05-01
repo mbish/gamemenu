@@ -76,6 +76,9 @@
             pname = name;
             release = true;
             inherit cargoArtifacts;
+            propagatedBuildInputs = with pkgs; [
+              rofi
+            ];
           }
         );
     in
