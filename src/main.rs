@@ -84,8 +84,6 @@ fn main() {
     }
 
     let mut active_gamepad;
-    let mut pause_target = Command::new("kill").arg("-STOP").arg(target.pid().to_string()).spawn().expect("Failed to stop target process");
-    pause_target.wait().expect("Failed to wait on pause command");
     loop {
         'outer: loop {
             if !target.is_alive() {
@@ -109,6 +107,8 @@ fn main() {
             sleep(std::time::Duration::from_millis(100));
         }
         let pid = target.pid();
+        let mut pause_target = Command::new("kill").arg("-STOP").arg(target.pid().to_string()).spawn().expect("Failed to stop target process");
+        pause_target.wait().expect("Failed to wait on pause command");
         spawn(move || {
             debug!("Opening Rofi menu for PID: {:?}", pid);
             rofi_menu(pid);
