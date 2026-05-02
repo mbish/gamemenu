@@ -6,6 +6,7 @@ use std::{
     process::Command,
     thread::{sleep, spawn},
 };
+use procfs::process::Process;
 
 struct CommandBuilder {
     command: String,
@@ -64,12 +65,15 @@ impl RofiChoice {
 fn main() {
     env_logger::init();
     let args: Vec<String> = env::args().collect();
-    let target = match args.get(1) {
-        Some(pid) => pid.parse::<u32>().expect("PID must be a number"),
-        None => {
-            error!("Usage: {} <pid>", args[0]);
-            std::process::exit(1);
-        }
+    let target = {
+        let pid = match args.get(1) {
+            Some(pid) => pid.parse::<i32>().expect("PID must be a number"),
+            None => {
+                error!("Usage: {} <pid>", args[0]);
+                std::process::exit(1);
+            }
+        };
+        Process::new(pid).expect("Failed to find process with given PID")
     };
     let mut gilrs = Gilrs::new().unwrap();
     let mut enigo = Enigo::new(&Settings::default()).unwrap();
@@ -80,8 +84,14 @@ fn main() {
     }
 
     let mut active_gamepad;
+    let mut pause_target = Command::new("kill").arg("-STOP").arg(target.pid().to_string()).spawn().expect("Failed to stop target process");
+    pause_target.wait().expect("Failed to wait on pause command");
     loop {
         'outer: loop {
+            if !target.is_alive() {
+                info!("Target process has exited, exiting menu");
+                std::process::exit(0);
+            }
             while let Some(Event { event, id, .. }) = gilrs.next_event() {
                 active_gamepad = Some(id);
                 debug!("New event from {}: {:?}", id, event);
@@ -96,12 +106,18 @@ fn main() {
                     break 'outer;
                 }
             }
+            sleep(std::time::Duration::from_millis(100));
         }
+        let pid = target.pid();
         spawn(move || {
-            debug!("Opening Rofi menu for PID: {}", target);
-            rofi_menu(target);
+            debug!("Opening Rofi menu for PID: {:?}", pid);
+            rofi_menu(pid);
         });
         'outer: loop {
+            if !target.is_alive() {
+                info!("Target process has exited, exiting menu");
+                std::process::exit(0);
+            }
             while let Some(Event { event, .. }) = gilrs.next_event() {
                 match event {
                     EventType::ButtonPressed(Button::DPadDown, _) => {
@@ -125,11 +141,11 @@ fn main() {
     }
 }
 
-fn rofi_menu(target_pid: u32) {
+fn rofi_menu(target_pid: i32) {
     let choices = [
         RofiChoice {
             label: "Resume".to_string(),
-            command: None,
+            command: Some(CommandBuilder::new("kill").arg("-CONT").arg(&target_pid.to_string())),
         },
         RofiChoice {
             label: "Close".to_string(),

@@ -53,6 +53,7 @@
             ];
             nativeBuildInputs = with pkgs; [
               pkg-config
+              makeWrapper
             ];
             NIX_DEV_VERSION = "${
               if self ? rev then
@@ -76,9 +77,10 @@
             pname = name;
             release = true;
             inherit cargoArtifacts;
-            propagatedBuildInputs = with pkgs; [
-              rofi
-            ];
+            postFixup = ''
+              wrapProgram $out/bin/${name} \
+                --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.rofi ]}
+            '';
           }
         );
     in
