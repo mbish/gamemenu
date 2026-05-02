@@ -1,12 +1,12 @@
 use enigo::{Direction::Click, Enigo, Key, Keyboard, Settings};
 use gilrs::{Button, Event, EventType, Gilrs};
 use log::{debug, error, info, warn};
+use procfs::process::Process;
 use std::env;
 use std::{
     process::Command,
     thread::{sleep, spawn},
 };
-use procfs::process::Process;
 
 struct CommandBuilder {
     command: String,
@@ -145,7 +145,11 @@ fn rofi_menu(target_pid: i32) {
     let choices = [
         RofiChoice {
             label: "Resume".to_string(),
-            command: Some(CommandBuilder::new("kill").arg("-CONT").arg(&target_pid.to_string())),
+            command: Some(
+                CommandBuilder::new("kill")
+                    .arg("-CONT")
+                    .arg(&target_pid.to_string()),
+            ),
         },
         RofiChoice {
             label: "Close".to_string(),
