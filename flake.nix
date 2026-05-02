@@ -84,6 +84,9 @@
     in
     {
       defaultPackage.${system} = package;
+      overlays.${system}.default = [ (final: prev: {
+        gamemenu = package;
+      }) ];
       devShell.${system} = pkgs.mkShell {
         LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
         buildInputs = with pkgs; [
