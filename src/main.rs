@@ -1,5 +1,6 @@
 use enigo::{Direction::Click, Enigo, Key, Keyboard, Settings};
 use gilrs::{Button, Event, EventType, Gilrs};
+use log::{debug, error, info, warn};
 use std::env;
 use std::{
     process::Command,
@@ -41,18 +42,32 @@ struct RofiChoice {
 impl RofiChoice {
     pub fn run(self) {
         if let Some(command) = self.command {
-            let mut process = command.build().spawn().expect("Failed to execute command");
-            process.wait().expect("Failed to wait on process");
+            match command.build().spawn() {
+                Ok(mut process) => match process.wait() {
+                    Ok(status) => {
+                        if !status.success() {
+                            eprintln!("Command exited with status: {}", status);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to wait on process: {}", e);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to execute command: {}", e);
+                }
+            };
         }
     }
 }
 
 fn main() {
+    env_logger::init();
     let args: Vec<String> = env::args().collect();
     let target = match args.get(1) {
         Some(pid) => pid.parse::<u32>().expect("PID must be a number"),
         None => {
-            eprintln!("Usage: {} <pid>", args[0]);
+            error!("Usage: {} <pid>", args[0]);
             std::process::exit(1);
         }
     };
@@ -61,33 +76,44 @@ fn main() {
 
     // Iterate over all connected gamepads
     for (_id, gamepad) in gilrs.gamepads() {
-        println!("{} is {:?}", gamepad.name(), gamepad.power_info());
+        info!("{} is {:?}", gamepad.name(), gamepad.power_info());
     }
 
+    let mut active_gamepad;
     loop {
         'outer: loop {
-            while let Some(Event { event, .. }) = gilrs.next_event() {
-                match event {
-                    EventType::ButtonPressed(Button::Mode, _) => {
-                        spawn(move || {
-                            rofi_menu(target);
-                        });
-                        break 'outer;
-                    }
-                    _ => {}
+            while let Some(Event { event, id, .. }) = gilrs.next_event() {
+                active_gamepad = Some(id);
+                debug!("New event from {}: {:?}", id, event);
+                if let EventType::ButtonPressed(Button::Mode, _) = event {
+                    break 'outer;
+                }
+                if let Some(gamepad) = active_gamepad.map(|id| gilrs.gamepad(id))
+                    && gamepad.is_pressed(Button::Select)
+                    && gamepad.is_pressed(Button::LeftTrigger)
+                    && gamepad.is_pressed(Button::South)
+                {
+                    break 'outer;
                 }
             }
         }
+        spawn(move || {
+            debug!("Opening Rofi menu for PID: {}", target);
+            rofi_menu(target);
+        });
         'outer: loop {
             while let Some(Event { event, .. }) = gilrs.next_event() {
                 match event {
                     EventType::ButtonPressed(Button::DPadDown, _) => {
+                        debug!("DPadDown pressed, proxying to keyboard");
                         enigo.key(Key::DownArrow, Click).unwrap();
                     }
                     EventType::ButtonPressed(Button::DPadUp, _) => {
+                        debug!("DPadUp pressed, proxying to keyboard");
                         enigo.key(Key::UpArrow, Click).unwrap();
                     }
                     EventType::ButtonPressed(Button::South, _) => {
+                        debug!("South, proxying to keyboard");
                         enigo.key(Key::Return, Click).unwrap();
                         break 'outer;
                     }
@@ -127,10 +153,11 @@ fn rofi_menu(target_pid: u32) {
     match rofi::Rofi::new(&labels).run_index() {
         Ok(choice) => {
             if let Some(choice) = choices.into_iter().nth(choice) {
+                debug!("User selected: {}", choice.label);
                 choice.run();
             }
         }
-        Err(rofi::Error::Interrupted) => println!("Interrupted"),
-        Err(e) => println!("Error: {}", e),
+        Err(rofi::Error::Interrupted) => warn!("Interrupted"),
+        Err(e) => error!("Error: {}", e),
     }
 }

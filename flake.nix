@@ -19,7 +19,7 @@
     let
       system = "x86_64-linux";
       target = "x86_64-unknown-linux-gnu";
-      name = "killjoy";
+      name = "gamemenu";
 
       pkgs = (import nixpkgs) {
         inherit system;
