@@ -107,8 +107,8 @@ fn main() {
             sleep(std::time::Duration::from_millis(100));
         }
         let pid = target.pid();
-        /* let mut pause_target = Command::new("kill").arg("-STOP").arg(target.pid().to_string()).spawn().expect("Failed to stop target process");
-        pause_target.wait().expect("Failed to wait on pause command"); */
+        let mut pause_target = Command::new("kill").arg("-USR1").arg(target.pid().to_string()).spawn().expect("Failed to stop target process");
+        pause_target.wait().expect("Failed to wait on pause command");
         spawn(move || {
             debug!("Opening Rofi menu for PID: {:?}", pid);
             rofi_menu(pid);
@@ -147,7 +147,7 @@ fn rofi_menu(target_pid: i32) {
             label: "Resume".to_string(),
             command: Some(
                 CommandBuilder::new("kill")
-                    .arg("-CONT")
+                    .arg("-USR2")
                     .arg(&target_pid.to_string()),
             ),
         },
